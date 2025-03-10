@@ -89,6 +89,7 @@ def housecallpro_webhook():
 
     # Create customer in JobTread
     success = create_customer_in_jobtread(jobtread_customer_data)
+    print("success",success)
     return jsonify({"status": "success" if success else "error"}), 200
 
 # Webhook endpoint for JobTread
@@ -99,8 +100,7 @@ def jobtread_webhook():
 
     # Prepare data for Housecall Pro API
     housecallpro_customer_data = {
-        "first_name": data.get("first_name"),  # Ensure at least one required field is present
-        "last_name": data.get("last_name"),
+        "name": data.get("name"),  # Ensure this is not null
         "email": data.get("email"),
         "phone": data.get("phone"),
         "industry": "Real Estate",
@@ -109,6 +109,7 @@ def jobtread_webhook():
 
     # Create customer in Housecall Pro
     success = create_customer_in_housecallpro(housecallpro_customer_data)
+    print("success",success)
     return jsonify({"status": "success" if success else "error"}), 200
 
 # Root route
@@ -118,5 +119,5 @@ def home():
 
 # Run the Flask app
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 5001))  # Use Render's PORT variable
+    port = int(os.environ.get("PORT", 5000))  # Use Render's PORT variable
     app.run(host="0.0.0.0", port=port)
