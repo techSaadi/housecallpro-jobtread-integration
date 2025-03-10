@@ -78,18 +78,28 @@ def housecallpro_webhook():
     data = request.json
     print("Received data from Housecall Pro:", data)
 
+    # Extract customer data from the nested structure
+    customer = data.get("estimate", {}).get("customer", {})
+    address = data.get("estimate", {}).get("address", {})
+
     # Prepare data for JobTread API
     jobtread_customer_data = {
-        "name": data.get("name"),  # Ensure this is not null
-        "email": data.get("email"),
-        "phone": data.get("phone"),
+        "name": customer.get("first_name", "") + " " + customer.get("last_name", ""),  # Combine first and last name
+        "email": customer.get("email"),
+        "phone": customer.get("mobile_number") or customer.get("home_number"),  # Use mobile or home number
         "industry": "Real Estate",
-        "projectType": "Business Setup"
+        "projectType": "Business Setup",
+        "address": address.get("street")  # Include address if needed
     }
+
+    # Validate required fields
+    if not jobtread_customer_data.get("name"):
+        print("Error: 'name' field is required for JobTread API.")
+        return jsonify({"status": "error", "message": "'name' field is required"}), 400
 
     # Create customer in JobTread
     success = create_customer_in_jobtread(jobtread_customer_data)
-    print("success",success)
+    print("success", success)
     return jsonify({"status": "success" if success else "error"}), 200
 
 # Webhook endpoint for JobTread
@@ -98,18 +108,30 @@ def jobtread_webhook():
     data = request.json
     print("Received data from JobTread:", data)
 
+    # Extract customer data from the nested structure
+    location = data.get("createdEvent", {}).get("location", {})
+    contact = data.get("createdEvent", {}).get("contact", {})
+
     # Prepare data for Housecall Pro API
     housecallpro_customer_data = {
-        "name": data.get("name"),  # Ensure this is not null
-        "email": data.get("email"),
-        "phone": data.get("phone"),
+        "first_name": contact.get("firstName", ""),  # Use first name if available
+        "last_name": contact.get("lastName", ""),    # Use last name if available
+        "email": contact.get("email"),              # Use email if available
+        "phone": contact.get("phone"),              # Use phone if available
+        "address": location.get("address"),         # Include address if needed
         "industry": "Real Estate",
         "projectType": "Business Setup"
     }
 
+    # Validate required fields
+    required_fields = ["first_name", "last_name", "email", "phone"]
+    if not any(field in housecallpro_customer_data for field in required_fields):
+        print("Error: Customer must have one of first name, last name, email, or phone number.")
+        return jsonify({"status": "error", "message": "Missing required fields"}), 400
+
     # Create customer in Housecall Pro
     success = create_customer_in_housecallpro(housecallpro_customer_data)
-    print("success",success)
+    print("success", success)
     return jsonify({"status": "success" if success else "error"}), 200
 
 # Root route
