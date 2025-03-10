@@ -106,35 +106,40 @@ def housecallpro_webhook():
 # Webhook endpoint for JobTread
 @app.route("/jobtread-webhook", methods=["POST"])
 def jobtread_webhook():
-    data = request.json
-    print("Received data from JobTread:", data)
+    try:
+        data = request.json
+        print("Received data from JobTread:", data)
 
-    # Extract customer data from the nested structure
-    location = data.get("createdEvent", {}).get("location", {})
-    contact = data.get("createdEvent", {}).get("contact", {})
+        # Extract customer data from the nested structure
+        created_event = data.get("createdEvent", {})
+        location = created_event.get("location", {})
+        contact = created_event.get("contact", {})  # Default to an empty dict if contact is missing
 
-    # Prepare data for Housecall Pro API
-    housecallpro_customer_data = {
-        "first_name": contact.get("firstName", ""),  # Use first name if available
-        "last_name": contact.get("lastName", ""),    # Use last name if available
-        "email": contact.get("email"),              # Use email if available
-        "phone": contact.get("phone"),              # Use phone if available
-        "address": location.get("address"),         # Include address if needed
-        "industry": "Real Estate",
-        "projectType": "Business Setup"
-    }
+        # Prepare data for Housecall Pro API
+        housecallpro_customer_data = {
+            "first_name": contact.get("firstName", ""),  # Use first name if available
+            "last_name": contact.get("lastName", ""),    # Use last name if available
+            "email": contact.get("email"),              # Use email if available
+            "phone": contact.get("phone"),              # Use phone if available
+            "address": location.get("address"),         # Include address if needed
+            "industry": "Real Estate",
+            "projectType": "Business Setup"
+        }
 
-    # Validate required fields
-    required_fields = ["first_name", "last_name", "email", "phone"]
-    if not any(field in housecallpro_customer_data for field in required_fields):
-        print("Error: Customer must have one of first name, last name, email, or phone number.")
-        return jsonify({"status": "error", "message": "Missing required fields"}), 400
+        # Validate required fields
+        required_fields = ["first_name", "last_name", "email", "phone"]
+        if not any(field in housecallpro_customer_data for field in required_fields):
+            print("Error: Customer must have one of first name, last name, email, or phone number.")
+            return jsonify({"status": "error", "message": "Missing required fields"}), 400
 
-    # Create customer in Housecall Pro
-    success = create_customer_in_housecallpro(housecallpro_customer_data)
-    print("success", success)
-    return jsonify({"status": "success" if success else "error"}), 200
+        # Create customer in Housecall Pro
+        success = create_customer_in_housecallpro(housecallpro_customer_data)
+        print("success", success)
+        return jsonify({"status": "success" if success else "error"}), 200
 
+    except Exception as e:
+        print(f"Exception in jobtread_webhook: {e}")
+        return jsonify({"status": "error", "message": str(e)}), 500
 # Root route
 @app.route("/")
 def home():
