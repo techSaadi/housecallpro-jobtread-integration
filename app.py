@@ -122,8 +122,13 @@ def jobtread_webhook():
         location = created_event.get("location", {})
         print("Location:", location)
 
-        contact = created_event.get("contact", {})  # Default to an empty dict if contact is missing
+        contact = created_event.get("contact", {})  # Default to an empty dict if contact is missing or None
         print("Contact:", contact)
+
+        # Check if contact data is available
+        if not contact:
+            print("Warning: 'contact' field is missing or empty in the data.")
+            return jsonify({"status": "error", "message": "'contact' field is required"}), 400
 
         # Prepare data for Housecall Pro API
         housecallpro_customer_data = {
