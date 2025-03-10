@@ -6,6 +6,7 @@ from dotenv import load_dotenv
 # Load environment variables from .env file
 load_dotenv()
 
+# Initialize Flask app
 app = Flask(__name__)
 
 # API Keys & URLs from .env
@@ -83,6 +84,19 @@ def jobtread_webhook():
 
         # Extract event type
         event_type = data.get("createdEvent", {}).get("type")
+
+        # If event_type is None, infer it based on the data structure
+        if event_type is None:
+            if "contact" in data.get("createdEvent", {}):
+                event_type = "customerCreated"
+            elif "job" in data.get("createdEvent", {}):
+                event_type = "jobCreated"
+            elif "estimate" in data.get("createdEvent", {}):
+                event_type = "estimateCreated"
+            else:
+                print("Warning: Unable to infer event type from the data.")
+                return jsonify({"status": "error", "message": "Unable to infer event type"}), 400
+
         print("Event Type:", event_type)
 
         if event_type == "customerCreated":
@@ -92,7 +106,7 @@ def jobtread_webhook():
 
             # Prepare data for Housecall Pro API
             housecallpro_customer_data = {
-                "name": contact.get("name", f"{contact.get('firstName', '')} {contact.get('lastName', '')}".strip()),  # Use name or combine first and last name
+                "name": contact.get("name", f"{contact.get('firstName', '')} {contact.get('lastName', '')}".strip()),
                 "email": contact.get("email"),
                 "phone": contact.get("phone"),
                 "address": location.get("address"),
@@ -167,6 +181,44 @@ def jobtread_webhook():
 
     except Exception as e:
         print(f"Exception in jobtread_webhook: {e}")
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+# Webhook endpoint for Housecall Pro
+@app.route("/housecallpro-webhook", methods=["POST"])
+def housecallpro_webhook():
+    try:
+        data = request.json
+        print("Received data from Housecall Pro:", data)
+
+        # Debug: Check if data is None
+        if data is None:
+            print("Error: No data received in the request.")
+            return jsonify({"status": "error", "message": "No data received"}), 400
+
+        # Extract event type
+        event_type = data.get("event")
+        print("Event Type:", event_type)
+
+        if event_type == "job.updated":
+            # Handle job updated event
+            job_data = data.get("job", {})
+            print("Processing updated job:", job_data)
+            # Add your logic here to handle the updated job
+            return jsonify({"status": "success"}), 200
+
+        elif event_type == "estimate.updated":
+            # Handle estimate updated event
+            estimate_data = data.get("estimate", {})
+            print("Processing updated estimate:", estimate_data)
+            # Add your logic here to handle the updated estimate
+            return jsonify({"status": "success"}), 200
+
+        else:
+            print("Error: Unsupported event type.")
+            return jsonify({"status": "error", "message": "Unsupported event type"}), 400
+
+    except Exception as e:
+        print(f"Exception in housecallpro_webhook: {e}")
         return jsonify({"status": "error", "message": str(e)}), 500
 
 # Root route
