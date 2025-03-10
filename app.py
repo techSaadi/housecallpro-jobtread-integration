@@ -79,12 +79,13 @@ def housecallpro_webhook():
     print("Received data from Housecall Pro:", data)
 
     # Extract customer data from the nested structure
-    customer = data.get("estimate", {}).get("customer", {})
-    address = data.get("estimate", {}).get("address", {})
+    customer = data.get("customer", {})  # Extract customer data directly
+    addresses = customer.get("addresses", [{}])  # Get the first address if available
+    address = addresses[0] if addresses else {}
 
     # Prepare data for JobTread API
     jobtread_customer_data = {
-        "name": customer.get("first_name", "") + " " + customer.get("last_name", ""),  # Combine first and last name
+        "name": f"{customer.get('first_name', '')} {customer.get('last_name', '')}".strip(),  # Combine first and last name
         "email": customer.get("email"),
         "phone": customer.get("mobile_number") or customer.get("home_number"),  # Use mobile or home number
         "industry": "Real Estate",
