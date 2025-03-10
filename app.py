@@ -110,10 +110,20 @@ def jobtread_webhook():
         data = request.json
         print("Received data from JobTread:", data)
 
+        # Debug: Check if data is None
+        if data is None:
+            print("Error: No data received in the request.")
+            return jsonify({"status": "error", "message": "No data received"}), 400
+
         # Extract customer data from the nested structure
         created_event = data.get("createdEvent", {})
+        print("Created Event:", created_event)
+
         location = created_event.get("location", {})
+        print("Location:", location)
+
         contact = created_event.get("contact", {})  # Default to an empty dict if contact is missing
+        print("Contact:", contact)
 
         # Prepare data for Housecall Pro API
         housecallpro_customer_data = {
