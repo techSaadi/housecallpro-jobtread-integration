@@ -203,6 +203,44 @@ def jobtread_webhook():
         print(f"Exception in jobtread_webhook: {e}")
         return jsonify({"status": "error", "message": str(e)}), 500
 
+# Webhook endpoint for Housecall Pro
+@app.route("/housecallpro-webhook", methods=["POST"])
+def housecallpro_webhook():
+    try:
+        data = request.json
+        print("Received data from Housecall Pro:", data)
+
+        # Debug: Check if data is None
+        if data is None:
+            print("Error: No data received in the request.")
+            return jsonify({"status": "error", "message": "No data received"}), 400
+
+        # Extract event type
+        event_type = data.get("event")
+        print("Event Type:", event_type)
+
+        if event_type == "job.updated":
+            # Handle job updated event
+            job_data = data.get("job", {})
+            print("Processing updated job:", job_data)
+            # Add your logic here to handle the updated job
+            return jsonify({"status": "success"}), 200
+
+        elif event_type == "estimate.updated":
+            # Handle estimate updated event
+            estimate_data = data.get("estimate", {})
+            print("Processing updated estimate:", estimate_data)
+            # Add your logic here to handle the updated estimate
+            return jsonify({"status": "success"}), 200
+
+        else:
+            print("Error: Unsupported event type.")
+            return jsonify({"status": "error", "message": "Unsupported event type"}), 400
+
+    except Exception as e:
+        print(f"Exception in housecallpro_webhook: {e}")
+        return jsonify({"status": "error", "message": str(e)}), 500
+
 # Root route
 @app.route("/")
 def home():
