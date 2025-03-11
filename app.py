@@ -104,6 +104,10 @@ def jobtread_webhook():
             contact = data.get("createdEvent", {}).get("contact", {})
             location = data.get("createdEvent", {}).get("location", {})
 
+            # Log contact and location data for debugging
+            print("Contact Data:", contact)
+            print("Location Data:", location)
+
             # Prepare data for Housecall Pro API
             housecallpro_customer_data = {
                 "name": contact.get("name", f"{contact.get('firstName', '')} {contact.get('lastName', '')}".strip()),
@@ -113,6 +117,9 @@ def jobtread_webhook():
                 "industry": "Real Estate",
                 "projectType": "Business Setup"
             }
+
+            # Log prepared customer data for debugging
+            print("Housecall Pro Customer Data:", housecallpro_customer_data)
 
             # Validate required fields
             required_fields = ["name", "email", "phone"]
@@ -131,6 +138,11 @@ def jobtread_webhook():
             location = data.get("createdEvent", {}).get("location", {})
             contact = data.get("createdEvent", {}).get("contact", {})
 
+            # Log job, location, and contact data for debugging
+            print("Job Data:", job)
+            print("Location Data:", location)
+            print("Contact Data:", contact)
+
             # Prepare data for Housecall Pro API
             housecallpro_job_data = {
                 "customer_id": contact.get("id"),  # Use the customer ID from JobTread
@@ -138,6 +150,9 @@ def jobtread_webhook():
                 "address": location.get("address"),
                 "description": job.get("description")
             }
+
+            # Log prepared job data for debugging
+            print("Housecall Pro Job Data:", housecallpro_job_data)
 
             # Validate required fields
             required_fields = ["customer_id", "name", "address"]
@@ -156,6 +171,11 @@ def jobtread_webhook():
             job = data.get("createdEvent", {}).get("job", {})
             contact = data.get("createdEvent", {}).get("contact", {})
 
+            # Log estimate, job, and contact data for debugging
+            print("Estimate Data:", estimate)
+            print("Job Data:", job)
+            print("Contact Data:", contact)
+
             # Prepare data for Housecall Pro API
             housecallpro_estimate_data = {
                 "customer_id": contact.get("id"),  # Use the customer ID from JobTread
@@ -163,6 +183,9 @@ def jobtread_webhook():
                 "total_amount": estimate.get("totalAmount"),
                 "description": estimate.get("description")
             }
+
+            # Log prepared estimate data for debugging
+            print("Housecall Pro Estimate Data:", housecallpro_estimate_data)
 
             # Validate required fields
             required_fields = ["customer_id", "job_id", "total_amount"]
