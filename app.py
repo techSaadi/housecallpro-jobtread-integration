@@ -75,144 +75,49 @@ def create_estimate_in_housecallpro(estimate_data):
 def jobtread_webhook():
     try:
         data = request.json
-        print("Received data from JobTread:", data)
+        print("Received raw data from JobTread:", data)  # Log raw data
 
-        # Debug: Check if data is None
         if data is None:
             print("Error: No data received in the request.")
             return jsonify({"status": "error", "message": "No data received"}), 400
 
-        # Extract event type
-        event_type = data.get("createdEvent", {}).get("type")
+        # Check for 'createdEvent' key
+        created_event = data.get("createdEvent")
+        if not created_event:
+            print("Error: 'createdEvent' key is missing in the payload.")
+            return jsonify({"status": "error", "message": "Missing 'createdEvent' key"}), 400
 
-        # If event_type is None, infer it based on the data structure
+        # Extract event type
+        event_type = created_event.get("type")
+        print("Extracted Event Type:", event_type)  # Log the extracted event type
+
         if event_type is None:
-            if "contact" in data.get("createdEvent", {}):
+            print("Warning: Event type is None. Attempting to infer event type.")
+            if "contact" in created_event:
                 event_type = "customerCreated"
-            elif "job" in data.get("createdEvent", {}):
+            elif "job" in created_event:
                 event_type = "jobCreated"
-            elif "estimate" in data.get("createdEvent", {}):
+            elif "estimate" in created_event:
                 event_type = "estimateCreated"
-            elif "file" in data.get("createdEvent", {}):
-                event_type = "fileCreated"  # Infer fileCreated event
+            elif "file" in created_event:
+                event_type = "fileCreated"
             else:
-                print("Warning: Unable to infer event type from the data.")
+                print("Error: Unable to infer event type from the data.")
                 return jsonify({"status": "error", "message": "Unable to infer event type"}), 400
 
-        print("Event Type:", event_type)
+        print("Processing Event Type:", event_type)
 
-        if event_type == "customerCreated":
-            # Handle new customer
-            contact = data.get("createdEvent", {}).get("contact", {})
-            location = data.get("createdEvent", {}).get("location", {})
+        # Handle the event based on its type
+        if event_type == "fileCreated" or event_type == "fileUpdated":
+            file_data = created_event.get("file", {})
+            job = created_event.get("job", {})
+            location = created_event.get("location", {})
 
-            # Log contact and location data for debugging
-            print("Contact Data:", contact)
-            print("Location Data:", location)
-
-            # Prepare data for Housecall Pro API
-            housecallpro_customer_data = {
-                "name": contact.get("name", f"{contact.get('firstName', '')} {contact.get('lastName', '')}".strip()),
-                "email": contact.get("email"),
-                "phone": contact.get("phone"),
-                "address": location.get("address"),
-                "industry": "Real Estate",
-                "projectType": "Business Setup"
-            }
-
-            # Log prepared customer data for debugging
-            print("Housecall Pro Customer Data:", housecallpro_customer_data)
-
-            # Validate required fields
-            required_fields = ["name", "email", "phone"]
-            if not any(field in housecallpro_customer_data for field in required_fields):
-                print("Error: Customer must have one of name, email, or phone number.")
-                return jsonify({"status": "error", "message": "Missing required fields"}), 400
-
-            # Create customer in Housecall Pro
-            success = create_customer_in_housecallpro(housecallpro_customer_data)
-            print("success", success)
-            return jsonify({"status": "success" if success else "error"}), 200
-
-        elif event_type == "jobCreated":
-            # Handle new job
-            job = data.get("createdEvent", {}).get("job", {})
-            location = data.get("createdEvent", {}).get("location", {})
-            contact = data.get("createdEvent", {}).get("contact", {})
-
-            # Log job, location, and contact data for debugging
-            print("Job Data:", job)
-            print("Location Data:", location)
-            print("Contact Data:", contact)
-
-            # Prepare data for Housecall Pro API
-            housecallpro_job_data = {
-                "customer_id": contact.get("id"),  # Use the customer ID from JobTread
-                "name": job.get("name"),
-                "address": location.get("address"),
-                "description": job.get("description")
-            }
-
-            # Log prepared job data for debugging
-            print("Housecall Pro Job Data:", housecallpro_job_data)
-
-            # Validate required fields
-            required_fields = ["customer_id", "name", "address"]
-            if not all(field in housecallpro_job_data for field in required_fields):
-                print("Error: Missing required fields for creating a job.")
-                return jsonify({"status": "error", "message": "Missing required fields"}), 400
-
-            # Create job in Housecall Pro
-            success = create_job_in_housecallpro(housecallpro_job_data)
-            print("success", success)
-            return jsonify({"status": "success" if success else "error"}), 200
-
-        elif event_type == "estimateCreated":
-            # Handle new estimate
-            estimate = data.get("createdEvent", {}).get("estimate", {})
-            job = data.get("createdEvent", {}).get("job", {})
-            contact = data.get("createdEvent", {}).get("contact", {})
-
-            # Log estimate, job, and contact data for debugging
-            print("Estimate Data:", estimate)
-            print("Job Data:", job)
-            print("Contact Data:", contact)
-
-            # Prepare data for Housecall Pro API
-            housecallpro_estimate_data = {
-                "customer_id": contact.get("id"),  # Use the customer ID from JobTread
-                "job_id": job.get("id"),         # Use the job ID from JobTread
-                "total_amount": estimate.get("totalAmount"),
-                "description": estimate.get("description")
-            }
-
-            # Log prepared estimate data for debugging
-            print("Housecall Pro Estimate Data:", housecallpro_estimate_data)
-
-            # Validate required fields
-            required_fields = ["customer_id", "job_id", "total_amount"]
-            if not all(field in housecallpro_estimate_data for field in required_fields):
-                print("Error: Missing required fields for creating an estimate.")
-                return jsonify({"status": "error", "message": "Missing required fields"}), 400
-
-            # Create estimate in Housecall Pro
-            success = create_estimate_in_housecallpro(housecallpro_estimate_data)
-            print("success", success)
-            return jsonify({"status": "success" if success else "error"}), 200
-
-        elif event_type == "fileCreated" or event_type == "fileUpdated":
-            # Handle file created or updated event
-            file_data = data.get("createdEvent", {}).get("file", {})
-            job = data.get("createdEvent", {}).get("job", {})
-            location = data.get("createdEvent", {}).get("location", {})
-
-            # Log file, job, and location data for debugging
             print("File Data:", file_data)
             print("Job Data:", job)
             print("Location Data:", location)
 
-            # Add your logic here to handle the file created or updated event
-            # For example, you might want to log the file details or trigger another process
+            # Add your logic here to handle the file event
             print(f"Handling {event_type} event for file: {file_data.get('name')}")
 
             return jsonify({"status": "success"}), 200
