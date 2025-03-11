@@ -93,6 +93,8 @@ def jobtread_webhook():
                 event_type = "jobCreated"
             elif "estimate" in data.get("createdEvent", {}):
                 event_type = "estimateCreated"
+            elif "file" in data.get("createdEvent", {}):
+                event_type = "fileCreated"  # Infer fileCreated event
             else:
                 print("Warning: Unable to infer event type from the data.")
                 return jsonify({"status": "error", "message": "Unable to infer event type"}), 400
@@ -197,6 +199,23 @@ def jobtread_webhook():
             success = create_estimate_in_housecallpro(housecallpro_estimate_data)
             print("success", success)
             return jsonify({"status": "success" if success else "error"}), 200
+
+        elif event_type == "fileCreated" or event_type == "fileUpdated":
+            # Handle file created or updated event
+            file_data = data.get("createdEvent", {}).get("file", {})
+            job = data.get("createdEvent", {}).get("job", {})
+            location = data.get("createdEvent", {}).get("location", {})
+
+            # Log file, job, and location data for debugging
+            print("File Data:", file_data)
+            print("Job Data:", job)
+            print("Location Data:", location)
+
+            # Add your logic here to handle the file created or updated event
+            # For example, you might want to log the file details or trigger another process
+            print(f"Handling {event_type} event for file: {file_data.get('name')}")
+
+            return jsonify({"status": "success"}), 200
 
         else:
             print("Error: Unsupported event type.")
