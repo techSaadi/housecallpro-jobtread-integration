@@ -82,14 +82,12 @@ def jobtread_webhook():
             return jsonify({"status": "error", "message": "No data received"}), 400
 
         # Check for 'createdEvent' key
-        created_event = data.get("createdEvent")
-        if not created_event:
-            print("Error: 'createdEvent' key is missing in the payload.")
-            return jsonify({"status": "error", "message": "Missing 'createdEvent' key"}), 400
+        created_event = data.get("createdEvent", {})  # Default to empty dict if missing
+        print("Created Event Data:", created_event)
 
         # Extract event type
         event_type = created_event.get("type")
-        print("Extracted Event Type:", event_type)  # Log the extracted event type
+        print("Extracted Event Type:", event_type)
 
         if event_type is None:
             print("Warning: Event type is None. Attempting to infer event type.")
@@ -102,70 +100,107 @@ def jobtread_webhook():
             elif "file" in created_event:
                 event_type = "fileCreated"
             else:
-                print("Error: Unable to infer event type from the data.")
-                return jsonify({"status": "error", "message": "Unable to infer event type"}), 400
+                print("Warning: Unable to infer event type from the data.")
+                event_type = "unknown"  # Default to unknown event type
 
         print("Processing Event Type:", event_type)
 
         # Handle the event based on its type
         if event_type == "fileCreated" or event_type == "fileUpdated":
-            file_data = created_event.get("file", {})
-            job = created_event.get("job", {})
-            location = created_event.get("location", {})
+            file_data = created_event.get("file", {})  # Default to empty dict if missing
+            job = created_event.get("job", {})  # Default to empty dict if missing
+            location = created_event.get("location", {})  # Default to empty dict if missing
 
             print("File Data:", file_data)
             print("Job Data:", job)
             print("Location Data:", location)
 
             # Add your logic here to handle the file event
-            print(f"Handling {event_type} event for file: {file_data.get('name')}")
+            print(f"Handling {event_type} event for file: {file_data.get('name', 'Unknown')}")
 
             return jsonify({"status": "success"}), 200
 
+        elif event_type == "customerCreated":
+            # Handle customer creation event
+            contact = created_event.get("contact", {})  # Default to empty dict if missing
+            location = created_event.get("location", {})  # Default to empty dict if missing
+
+            print("Contact Data:", contact)
+            print("Location Data:", location)
+
+            # Prepare data for Housecall Pro API (no validation for required fields)
+            housecallpro_customer_data = {
+                "name": contact.get("name", f"{contact.get('firstName', '')} {contact.get('lastName', '')}".strip()),
+                "email": contact.get("email", ""),
+                "phone": contact.get("phone", ""),
+                "address": location.get("address", ""),
+                "industry": "Real Estate",
+                "projectType": "Business Setup"
+            }
+
+            print("Housecall Pro Customer Data:", housecallpro_customer_data)
+
+            # Create customer in Housecall Pro (even if some fields are missing)
+            success = create_customer_in_housecallpro(housecallpro_customer_data)
+            print("Customer creation success:", success)
+            return jsonify({"status": "success" if success else "error"}), 200
+
+        elif event_type == "jobCreated":
+            # Handle job creation event
+            job = created_event.get("job", {})  # Default to empty dict if missing
+            location = created_event.get("location", {})  # Default to empty dict if missing
+            contact = created_event.get("contact", {})  # Default to empty dict if missing
+
+            print("Job Data:", job)
+            print("Location Data:", location)
+            print("Contact Data:", contact)
+
+            # Prepare data for Housecall Pro API (no validation for required fields)
+            housecallpro_job_data = {
+                "customer_id": contact.get("id", ""),  # Use the customer ID from JobTread (if available)
+                "name": job.get("name", ""),
+                "address": location.get("address", ""),
+                "description": job.get("description", "")
+            }
+
+            print("Housecall Pro Job Data:", housecallpro_job_data)
+
+            # Create job in Housecall Pro (even if some fields are missing)
+            success = create_job_in_housecallpro(housecallpro_job_data)
+            print("Job creation success:", success)
+            return jsonify({"status": "success" if success else "error"}), 200
+
+        elif event_type == "estimateCreated":
+            # Handle estimate creation event
+            estimate = created_event.get("estimate", {})  # Default to empty dict if missing
+            job = created_event.get("job", {})  # Default to empty dict if missing
+            contact = created_event.get("contact", {})  # Default to empty dict if missing
+
+            print("Estimate Data:", estimate)
+            print("Job Data:", job)
+            print("Contact Data:", contact)
+
+            # Prepare data for Housecall Pro API (no validation for required fields)
+            housecallpro_estimate_data = {
+                "customer_id": contact.get("id", ""),  # Use the customer ID from JobTread (if available)
+                "job_id": job.get("id", ""),  # Use the job ID from JobTread (if available)
+                "total_amount": estimate.get("totalAmount", 0),  # Default to 0 if missing
+                "description": estimate.get("description", "")
+            }
+
+            print("Housecall Pro Estimate Data:", housecallpro_estimate_data)
+
+            # Create estimate in Housecall Pro (even if some fields are missing)
+            success = create_estimate_in_housecallpro(housecallpro_estimate_data)
+            print("Estimate creation success:", success)
+            return jsonify({"status": "success" if success else "error"}), 200
+
         else:
-            print("Error: Unsupported event type.")
-            return jsonify({"status": "error", "message": "Unsupported event type"}), 400
+            print("Warning: Unsupported event type.")
+            return jsonify({"status": "success", "message": "Unsupported event type, but request processed"}), 200
 
     except Exception as e:
         print(f"Exception in jobtread_webhook: {e}")
-        return jsonify({"status": "error", "message": str(e)}), 500
-
-# Webhook endpoint for Housecall Pro
-@app.route("/housecallpro-webhook", methods=["POST"])
-def housecallpro_webhook():
-    try:
-        data = request.json
-        print("Received data from Housecall Pro:", data)
-
-        # Debug: Check if data is None
-        if data is None:
-            print("Error: No data received in the request.")
-            return jsonify({"status": "error", "message": "No data received"}), 400
-
-        # Extract event type
-        event_type = data.get("event")
-        print("Event Type:", event_type)
-
-        if event_type == "job.updated":
-            # Handle job updated event
-            job_data = data.get("job", {})
-            print("Processing updated job:", job_data)
-            # Add your logic here to handle the updated job
-            return jsonify({"status": "success"}), 200
-
-        elif event_type == "estimate.updated":
-            # Handle estimate updated event
-            estimate_data = data.get("estimate", {})
-            print("Processing updated estimate:", estimate_data)
-            # Add your logic here to handle the updated estimate
-            return jsonify({"status": "success"}), 200
-
-        else:
-            print("Error: Unsupported event type.")
-            return jsonify({"status": "error", "message": "Unsupported event type"}), 400
-
-    except Exception as e:
-        print(f"Exception in housecallpro_webhook: {e}")
         return jsonify({"status": "error", "message": str(e)}), 500
 
 # Root route
