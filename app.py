@@ -96,7 +96,7 @@ def create_job_in_jobtread(job_data):
 def jobtread_webhook():
     try:
         data = request.json
-        print("Received raw data from JobTread:", data)  # Log raw data
+        print("Received raw data from JobTread:", data)
 
         if data is None:
             print("Error: No data received in the request.")
@@ -110,7 +110,7 @@ def jobtread_webhook():
 
         # Extract event type
         event_type = created_event.get("type")
-        print("Extracted Event Type:", event_type)  # Log the extracted event type
+        print("Extracted Event Type:", event_type)
 
         if event_type is None:
             print("Warning: Event type is None. Attempting to infer event type.")
@@ -156,7 +156,7 @@ def jobtread_webhook():
 def housecallpro_webhook():
     try:
         data = request.json
-        print("Received data from Housecall Pro:", data)
+        print("Received raw data from Housecall Pro:", data)
 
         # Debug: Check if data is None
         if data is None:
