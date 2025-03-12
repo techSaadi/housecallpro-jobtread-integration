@@ -15,23 +15,42 @@ HOUSECALL_PRO_API_URL = os.getenv("HOUSECALL_PRO_API_URL")
 JOBTREAD_API_KEY = os.getenv("JOBTREAD_API_KEY")
 JOBTREAD_API_URL = os.getenv("JOBTREAD_API_URL")
 
-# Function to create a customer in JobTread
-def create_customer_in_jobtread(customer_data):
-    url = f"{JOBTREAD_API_URL}/customers"
+# Function to create a customer in Housecall Pro
+def create_customer_in_housecallpro(customer_data):
+    url = f"{HOUSECALL_PRO_API_URL}/customers"
     headers = {
-        "Authorization": f"Bearer {JOBTREAD_API_KEY}",
+        "Authorization": f"Bearer {HOUSECALL_PRO_API_KEY}",
         "Content-Type": "application/json"
     }
 
-    # Ensure required fields are present
-    required_fields = ["first_name", "last_name", "email", "phone"]
-    if not all(field in customer_data for field in required_fields):
-        print("Error: Missing required fields for creating a customer in JobTread.")
+    # Ensure at least one required field is present
+    required_fields = ["name", "email", "phone"]
+    if not any(field in customer_data for field in required_fields):
+        print("Error: Customer must have one of name, email, or phone number.")
         return False
 
     response = requests.post(url, json=customer_data, headers=headers)
 
-    print("JobTread API Response:", response.status_code, response.text)
+    print("Housecall Pro API Response:", response.status_code, response.text)
+    return response.status_code == 201
+
+# Function to create a job in Housecall Pro
+def create_job_in_housecallpro(job_data):
+    url = f"{HOUSECALL_PRO_API_URL}/jobs"
+    headers = {
+        "Authorization": f"Bearer {HOUSECALL_PRO_API_KEY}",
+        "Content-Type": "application/json"
+    }
+
+    # Ensure required fields are present
+    required_fields = ["customer_id", "name", "address"]
+    if not all(field in job_data for field in required_fields):
+        print("Error: Missing required fields for creating a job.")
+        return False
+
+    response = requests.post(url, json=job_data, headers=headers)
+
+    print("Housecall Pro API Response:", response.status_code, response.text)
     return response.status_code == 201
 
 # Function to create a job in JobTread
@@ -43,9 +62,9 @@ def create_job_in_jobtread(job_data):
     }
 
     # Ensure required fields are present
-    required_fields = ["name", "customer_id", "address"]
+    required_fields = ["customer_id", "name", "address"]
     if not all(field in job_data for field in required_fields):
-        print("Error: Missing required fields for creating a job in JobTread.")
+        print("Error: Missing required fields for creating a job.")
         return False
 
     response = requests.post(url, json=job_data, headers=headers)
@@ -53,13 +72,78 @@ def create_job_in_jobtread(job_data):
     print("JobTread API Response:", response.status_code, response.text)
     return response.status_code == 201
 
+# Webhook endpoint for JobTread
+@app.route("/jobtread-webhook", methods=["POST"])
+def jobtread_webhook():
+    try:
+        data = request.json
+        print("Received raw data from JobTread:", data)  # Log raw data
+
+        if data is None:
+            print("Error: No data received in the request.")
+            return jsonify({"status": "error", "message": "No data received"}), 400
+
+        # Check for 'createdEvent' key
+        created_event = data.get("createdEvent")
+        if not created_event:
+            print("Error: 'createdEvent' key is missing in the payload.")
+            return jsonify({"status": "error", "message": "Missing 'createdEvent' key"}), 400
+
+        # Extract event type
+        event_type = created_event.get("type")
+        print("Extracted Event Type:", event_type)  # Log the extracted event type
+
+        if event_type is None:
+            print("Warning: Event type is None. Attempting to infer event type.")
+            if "contact" in created_event:
+                event_type = "customerCreated"
+            elif "job" in created_event:
+                event_type = "jobCreated"
+            elif "estimate" in created_event:
+                event_type = "estimateCreated"
+            elif "file" in created_event:
+                event_type = "fileCreated"
+            else:
+                print("Error: Unable to infer event type from the data.")
+                return jsonify({"status": "error", "message": "Unable to infer event type"}), 400
+
+        print("Processing Event Type:", event_type)
+
+        # Handle the event based on its type
+        if event_type == "jobCreated":
+            job_data = created_event.get("job", {})
+            print("Job Data:", job_data)
+
+            # Map JobTread job data to Housecall Pro job data
+            housecallpro_job_data = {
+                "customer_id": job_data.get("customer_id"),
+                "name": job_data.get("name"),
+                "address": job_data.get("address"),
+                # Add other necessary fields
+            }
+
+            # Create the job in Housecall Pro
+            if create_job_in_housecallpro(housecallpro_job_data):
+                return jsonify({"status": "success"}), 200
+            else:
+                return jsonify({"status": "error", "message": "Failed to create job in Housecall Pro"}), 500
+
+        else:
+            print("Error: Unsupported event type.")
+            return jsonify({"status": "error", "message": "Unsupported event type"}), 400
+
+    except Exception as e:
+        print(f"Exception in jobtread_webhook: {e}")
+        return jsonify({"status": "error", "message": str(e)}), 500
+
 # Webhook endpoint for Housecall Pro
 @app.route("/housecallpro-webhook", methods=["POST"])
 def housecallpro_webhook():
     try:
         data = request.json
-        print("Received raw data from Housecall Pro:", data)
+        print("Received data from Housecall Pro:", data)
 
+        # Debug: Check if data is None
         if data is None:
             print("Error: No data received in the request.")
             return jsonify({"status": "error", "message": "No data received"}), 400
@@ -68,18 +152,25 @@ def housecallpro_webhook():
         event_type = data.get("event")
         print("Event Type:", event_type)
 
-        # Log the entire payload for debugging
-        print("Full Payload:", data)
+        if event_type == "job.created":
+            # Handle job created event
+            job_data = data.get("job", {})
+            print("Processing created job:", job_data)
 
-        # Handle the test payload
-        if data == {"foo": "bar"}:
-            print("Received test payload from Housecall Pro.")
-            return jsonify({"status": "success", "message": "Test webhook received"}), 200
+            # Map Housecall Pro job data to JobTread job data
+            jobtread_job_data = {
+                "customer_id": job_data.get("customer_id"),
+                "name": job_data.get("name"),
+                "address": job_data.get("address"),
+                # Add other necessary fields
+            }
 
-        # Handle supported event types
-        if event_type in ["customer.created", "customer.updated", "job.created", "job.updated", "estimate.approved", "estimate.created"]:
-            print(f"Processing {event_type} event.")
-            return jsonify({"status": "success", "message": f"Processed {event_type} event"}), 200
+            # Create the job in JobTread
+            if create_job_in_jobtread(jobtread_job_data):
+                return jsonify({"status": "success"}), 200
+            else:
+                return jsonify({"status": "error", "message": "Failed to create job in JobTread"}), 500
+
         else:
             print("Error: Unsupported event type.")
             return jsonify({"status": "error", "message": "Unsupported event type"}), 400
@@ -87,8 +178,6 @@ def housecallpro_webhook():
     except Exception as e:
         print(f"Exception in housecallpro_webhook: {e}")
         return jsonify({"status": "error", "message": str(e)}), 500
-
-        
 
 # Root route
 @app.route("/")
