@@ -12,6 +12,8 @@ app = Flask(__name__)
 # API Keys & URLs from .env
 HOUSECALL_PRO_API_KEY = os.getenv("HOUSECALL_PRO_API_KEY")
 HOUSECALL_PRO_API_URL = os.getenv("HOUSECALL_PRO_API_URL")
+JOBTREAD_API_KEY = os.getenv("JOBTREAD_API_KEY")
+JOBTREAD_API_URL = os.getenv("JOBTREAD_API_URL")
 
 # Function to create a customer in Housecall Pro
 def create_customer_in_housecallpro(customer_data):
@@ -70,6 +72,25 @@ def create_estimate_in_housecallpro(estimate_data):
     print("Housecall Pro API Response:", response.status_code, response.text)
     return response.status_code == 201
 
+# Function to create a job in JobTread
+def create_job_in_jobtread(job_data):
+    url = f"{JOBTREAD_API_URL}/jobs"
+    headers = {
+        "Authorization": f"Bearer {JOBTREAD_API_KEY}",
+        "Content-Type": "application/json"
+    }
+
+    # Ensure required fields are present
+    required_fields = ["name", "customer_id", "address"]
+    if not all(field in job_data for field in required_fields):
+        print("Error: Missing required fields for creating a job in JobTread.")
+        return False
+
+    response = requests.post(url, json=job_data, headers=headers)
+
+    print("JobTread API Response:", response.status_code, response.text)
+    return response.status_code == 201
+
 # Webhook endpoint for JobTread
 @app.route("/jobtread-webhook", methods=["POST"])
 def jobtread_webhook():
@@ -82,12 +103,14 @@ def jobtread_webhook():
             return jsonify({"status": "error", "message": "No data received"}), 400
 
         # Check for 'createdEvent' key
-        created_event = data.get("createdEvent", {})  # Default to empty dict if missing
-        print("Created Event Data:", created_event)
+        created_event = data.get("createdEvent")
+        if not created_event:
+            print("Error: 'createdEvent' key is missing in the payload.")
+            return jsonify({"status": "error", "message": "Missing 'createdEvent' key"}), 400
 
         # Extract event type
         event_type = created_event.get("type")
-        print("Extracted Event Type:", event_type)
+        print("Extracted Event Type:", event_type)  # Log the extracted event type
 
         if event_type is None:
             print("Warning: Event type is None. Attempting to infer event type.")
@@ -100,104 +123,29 @@ def jobtread_webhook():
             elif "file" in created_event:
                 event_type = "fileCreated"
             else:
-                print("Warning: Unable to infer event type from the data.")
-                event_type = "unknown"  # Default to unknown event type
+                print("Error: Unable to infer event type from the data.")
+                return jsonify({"status": "error", "message": "Unable to infer event type"}), 400
 
         print("Processing Event Type:", event_type)
 
         # Handle the event based on its type
         if event_type == "fileCreated" or event_type == "fileUpdated":
-            file_data = created_event.get("file", {})  # Default to empty dict if missing
-            job = created_event.get("job", {})  # Default to empty dict if missing
-            location = created_event.get("location", {})  # Default to empty dict if missing
+            file_data = created_event.get("file", {})
+            job = created_event.get("job", {})
+            location = created_event.get("location", {})
 
             print("File Data:", file_data)
             print("Job Data:", job)
             print("Location Data:", location)
 
             # Add your logic here to handle the file event
-            print(f"Handling {event_type} event for file: {file_data.get('name', 'Unknown')}")
+            print(f"Handling {event_type} event for file: {file_data.get('name')}")
 
             return jsonify({"status": "success"}), 200
 
-        elif event_type == "customerCreated":
-            # Handle customer creation event
-            contact = created_event.get("contact", {})  # Default to empty dict if missing
-            location = created_event.get("location", {})  # Default to empty dict if missing
-
-            print("Contact Data:", contact)
-            print("Location Data:", location)
-
-            # Prepare data for Housecall Pro API (no validation for required fields)
-            housecallpro_customer_data = {
-                "name": contact.get("name", f"{contact.get('firstName', '')} {contact.get('lastName', '')}".strip()),
-                "email": contact.get("email", ""),
-                "phone": contact.get("phone", ""),
-                "address": location.get("address", ""),
-                "industry": "Real Estate",
-                "projectType": "Business Setup"
-            }
-
-            print("Housecall Pro Customer Data:", housecallpro_customer_data)
-
-            # Create customer in Housecall Pro (even if some fields are missing)
-            success = create_customer_in_housecallpro(housecallpro_customer_data)
-            print("Customer creation success:", success)
-            return jsonify({"status": "success" if success else "error"}), 200
-
-        elif event_type == "jobCreated":
-            # Handle job creation event
-            job = created_event.get("job", {})  # Default to empty dict if missing
-            location = created_event.get("location", {})  # Default to empty dict if missing
-            contact = created_event.get("contact", {})  # Default to empty dict if missing
-
-            print("Job Data:", job)
-            print("Location Data:", location)
-            print("Contact Data:", contact)
-
-            # Prepare data for Housecall Pro API (no validation for required fields)
-            housecallpro_job_data = {
-                "customer_id": contact.get("id", ""),  # Use the customer ID from JobTread (if available)
-                "name": job.get("name", ""),
-                "address": location.get("address", ""),
-                "description": job.get("description", "")
-            }
-
-            print("Housecall Pro Job Data:", housecallpro_job_data)
-
-            # Create job in Housecall Pro (even if some fields are missing)
-            success = create_job_in_housecallpro(housecallpro_job_data)
-            print("Job creation success:", success)
-            return jsonify({"status": "success" if success else "error"}), 200
-
-        elif event_type == "estimateCreated":
-            # Handle estimate creation event
-            estimate = created_event.get("estimate", {})  # Default to empty dict if missing
-            job = created_event.get("job", {})  # Default to empty dict if missing
-            contact = created_event.get("contact", {})  # Default to empty dict if missing
-
-            print("Estimate Data:", estimate)
-            print("Job Data:", job)
-            print("Contact Data:", contact)
-
-            # Prepare data for Housecall Pro API (no validation for required fields)
-            housecallpro_estimate_data = {
-                "customer_id": contact.get("id", ""),  # Use the customer ID from JobTread (if available)
-                "job_id": job.get("id", ""),  # Use the job ID from JobTread (if available)
-                "total_amount": estimate.get("totalAmount", 0),  # Default to 0 if missing
-                "description": estimate.get("description", "")
-            }
-
-            print("Housecall Pro Estimate Data:", housecallpro_estimate_data)
-
-            # Create estimate in Housecall Pro (even if some fields are missing)
-            success = create_estimate_in_housecallpro(housecallpro_estimate_data)
-            print("Estimate creation success:", success)
-            return jsonify({"status": "success" if success else "error"}), 200
-
         else:
-            print("Warning: Unsupported event type.")
-            return jsonify({"status": "success", "message": "Unsupported event type, but request processed"}), 200
+            print("Error: Unsupported event type.")
+            return jsonify({"status": "error", "message": "Unsupported event type"}), 400
 
     except Exception as e:
         print(f"Exception in jobtread_webhook: {e}")
@@ -215,23 +163,54 @@ def housecallpro_webhook():
             print("Error: No data received in the request.")
             return jsonify({"status": "error", "message": "No data received"}), 400
 
+        # Handle the test payload
+        if data == {"foo": "bar"}:
+            print("Received test payload from Housecall Pro.")
+            return jsonify({"status": "success", "message": "Test webhook received"}), 200
+
         # Extract event type
         event_type = data.get("event")
         print("Event Type:", event_type)
 
-        if event_type == "job.updated":
-            # Handle job updated event
+        if event_type == "job.created":
+            # Handle job created event
             job_data = data.get("job", {})
-            print("Processing updated job:", job_data)
-            # Add your logic here to handle the updated job
-            return jsonify({"status": "success"}), 200
+            print("Processing new job:", job_data)
 
-        elif event_type == "estimate.updated":
-            # Handle estimate updated event
+            # Sync job to JobTread
+            jobtread_job_data = {
+                "name": job_data.get("name"),
+                "customer_id": job_data.get("customer_id"),
+                "address": job_data.get("address"),
+                # Add other required fields for JobTread
+            }
+
+            if create_job_in_jobtread(jobtread_job_data):
+                print("Job successfully synced to JobTread.")
+                return jsonify({"status": "success"}), 200
+            else:
+                print("Failed to sync job to JobTread.")
+                return jsonify({"status": "error", "message": "Failed to sync job"}), 500
+
+        elif event_type == "estimate.approved":
+            # Handle estimate approved event
             estimate_data = data.get("estimate", {})
-            print("Processing updated estimate:", estimate_data)
-            # Add your logic here to handle the updated estimate
-            return jsonify({"status": "success"}), 200
+            print("Processing approved estimate:", estimate_data)
+
+            # Convert estimate to job in JobTread
+            jobtread_job_data = {
+                "name": estimate_data.get("name"),
+                "customer_id": estimate_data.get("customer_id"),
+                "address": estimate_data.get("address"),
+                # Add other required fields for JobTread
+            }
+
+            if create_job_in_jobtread(jobtread_job_data):
+                print("Estimate successfully converted to job in JobTread.")
+                return jsonify({"status": "success"}), 200
+            else:
+                print("Failed to convert estimate to job in JobTread.")
+                return jsonify({"status": "error", "message": "Failed to convert estimate"}), 500
 
         else:
             print("Error: Unsupported event type.")
