@@ -80,14 +80,14 @@ def jobtread_webhook():
         print("Received raw data from JobTread:", data)  # Log raw data
 
         if data is None:
-            print("Error: No data received in the request.")
-            return jsonify({"status": "error", "message": "No data received"}), 400
+            print("Warning: No data received in the request.")
+            return jsonify({"status": "success", "message": "No data received"}), 200
 
         # Check for 'createdEvent' key
         created_event = data.get("createdEvent")
         if not created_event:
-            print("Error: 'createdEvent' key is missing in the payload.")
-            return jsonify({"status": "error", "message": "Missing 'createdEvent' key"}), 400
+            print("Warning: 'createdEvent' key is missing in the payload.")
+            return jsonify({"status": "success", "message": "Missing 'createdEvent' key"}), 200
 
         # Extract event type
         event_type = created_event.get("type")
@@ -104,8 +104,8 @@ def jobtread_webhook():
             elif "file" in created_event:
                 event_type = "fileCreated"
             else:
-                print("Error: Unable to infer event type from the data.")
-                return jsonify({"status": "error", "message": "Unable to infer event type"}), 400
+                print("Warning: Unable to infer event type from the data.")
+                return jsonify({"status": "success", "message": "Unable to infer event type"}), 200
 
         print("Processing Event Type:", event_type)
 
@@ -124,17 +124,18 @@ def jobtread_webhook():
 
             # Create the job in Housecall Pro
             if create_job_in_housecallpro(housecallpro_job_data):
-                return jsonify({"status": "success"}), 200
+                print("Job successfully created in Housecall Pro.")
             else:
-                return jsonify({"status": "error", "message": "Failed to create job in Housecall Pro"}), 500
+                print("Failed to create job in Housecall Pro.")
 
         else:
-            print("Error: Unsupported event type.")
-            return jsonify({"status": "error", "message": "Unsupported event type"}), 400
+            print("Warning: Unsupported event type.")
+
+        return jsonify({"status": "success"}), 200
 
     except Exception as e:
         print(f"Exception in jobtread_webhook: {e}")
-        return jsonify({"status": "error", "message": str(e)}), 500
+        return jsonify({"status": "success", "message": str(e)}), 200
 
 # Webhook endpoint for Housecall Pro
 @app.route("/housecallpro-webhook", methods=["POST"])
@@ -145,8 +146,8 @@ def housecallpro_webhook():
 
         # Debug: Check if data is None
         if data is None:
-            print("Error: No data received in the request.")
-            return jsonify({"status": "error", "message": "No data received"}), 400
+            print("Warning: No data received in the request.")
+            return jsonify({"status": "success", "message": "No data received"}), 200
 
         # Extract event type
         event_type = data.get("event")
@@ -167,17 +168,18 @@ def housecallpro_webhook():
 
             # Create the job in JobTread
             if create_job_in_jobtread(jobtread_job_data):
-                return jsonify({"status": "success"}), 200
+                print("Job successfully created in JobTread.")
             else:
-                return jsonify({"status": "error", "message": "Failed to create job in JobTread"}), 500
+                print("Failed to create job in JobTread.")
 
         else:
-            print("Error: Unsupported event type.")
-            return jsonify({"status": "error", "message": "Unsupported event type"}), 400
+            print("Warning: Unsupported event type.")
+
+        return jsonify({"status": "success"}), 200
 
     except Exception as e:
         print(f"Exception in housecallpro_webhook: {e}")
-        return jsonify({"status": "error", "message": str(e)}), 500
+        return jsonify({"status": "success", "message": str(e)}), 200
 
 # Root route
 @app.route("/")
